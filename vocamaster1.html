@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voca Master Challenge - 영어 단어 퀴즈</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Nunito', 'Jua', sans-serif;
+            background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 40%, #a1c4fd 100%);
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border: 4px solid #FFFFFF;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .game-btn {
+            transition: all 0.15s ease;
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .game-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .pulse-timer {
+            animation: pulse-ring 1s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(0.95); }
+        }
+
+        .correct-flash {
+            animation: flashGreen 0.6s ease;
+        }
+
+        @keyframes flashGreen {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(72, 187, 120, 0.4); }
+        }
+
+        .wrong-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-12px); }
+            40%, 80% { transform: translateX(12px); }
+        }
+
+        /* Custom scrollbar for teacher dashboard */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #FF6B6B;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-800">
+
+    <header class="p-4 flex justify-between items-center max-w-5xl mx-auto w-full">
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="showScreen('mode-select')">
+            <div class="bg-yellow-400 p-3 rounded-2xl shadow-lg border-2 border-white transform -rotate-6">
+                <i class="fa-solid fa-gamepad text-3xl text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-amber-900 drop-shadow">Voca Master!</h1>
+                <p class="text-xs font-bold text-amber-800/80">교과서 & 독해지문 어휘 게임</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <!-- BGM Toggle Button -->
+            <button id="bgm-btn" onclick="toggleBGM()" class="game-btn bg-purple-500 hover:bg-purple-600 text-white font-bold p-3 rounded-2xl flex items-center space-x-2 border-2 border-white">
+                <i id="bgm-icon" class="fa-solid fa-music"></i>
+                <span id="bgm-text" class="hidden md:inline text-sm">BGM ON</span>
+            </button>
+
+            <!-- Teacher Dashboard Button -->
+            <button onclick="openTeacherDashboard()" class="game-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold p-3 rounded-2xl flex items-center space-x-2 border-2 border-white">
+                <i class="fa-solid fa-chalkboard-user"></i>
+                <span class="hidden md:inline text-sm">교사 관리자</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-grow flex items-center justify-center p-4 max-w-4xl mx-auto w-full">
+
+        <section id="screen-mode-select" class="w-full glass-card rounded-3xl p-6 md:p-8 text-center space-y-6">
+            <div class="space-y-2">
+                <span class="bg-yellow-300 text-yellow-900 text-sm font-black px-4 py-1.5 rounded-full uppercase tracking-wider">학습 모드 선택</span>
+                <h2 class="text-3xl md:text-4xl font-extrabold text-slate-800">어느 지문을 도전해볼까요?</h2>
+                <p class="text-slate-600 font-semibold">이름을 입력하고 학습 세트를 선택하세요!</p>
+            </div>
+
+            <!-- Student Name Input -->
+            <div class="max-w-md mx-auto bg-white/80 p-4 rounded-2xl border-2 border-pink-200 shadow-inner">
+                <label class="block text-left text-sm font-bold text-slate-700 mb-1">
+                    <i class="fa-solid fa-user-graduate text-pink-500 mr-1"></i> 학생 이름 (학번)
+                </label>
+                <input type="text" id="student-name" placeholder="예: 20101 홍길동" class="w-full px-4 py-3 rounded-xl border-2 border-slate-300 focus:border-pink-500 focus:outline-none font-bold text-lg text-slate-800">
+            </div>
+
+            <!-- Set Cards Grid -->
+            <div class="grid md:grid-cols-2 gap-4 text-left">
+                <!-- Textbook Set Card -->
+                <div onclick="selectSet('textbook')" class="game-btn bg-gradient-to-br from-amber-300 to-orange-400 p-5 rounded-2xl border-4 border-white cursor-pointer hover:scale-[1.02] transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="bg-white text-orange-600 text-xs font-black px-3 py-1 rounded-full">교과서 1세트</span>
+                        <i class="fa-solid fa-flask-vial text-2xl text-white/80"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-white mb-1">Science Is for Everyone</h3>
+                    <p class="text-white/90 text-xs font-semibold mb-3">Galaxy Zoo & STEVE 시민 과학 프로젝트 핵심 어휘 (10문항)</p>
+                    <div class="flex items-center space-x-2 text-white font-bold text-xs">
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-clock mr-1"></i>10초</span>
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>재도전</span>
+                    </div>
+                </div>
+
+                <!-- Reading Set A Card -->
+                <div onclick="selectSet('readingA')" class="game-btn bg-gradient-to-br from-cyan-400 to-blue-500 p-5 rounded-2xl border-4 border-white cursor-pointer hover:scale-[1.02] transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="bg-white text-blue-600 text-xs font-black px-3 py-1 rounded-full">독해지문 2세트</span>
+                        <i class="fa-solid fa-laptop-code text-2xl text-white/80"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-white mb-1">미디어, 생산성 & 학습 실수</h3>
+                    <p class="text-white/90 text-xs font-semibold mb-3">20번(인플루언서), 21번(분주함), 22번(언어실수) 어휘 (10문항)</p>
+                    <div class="flex items-center space-x-2 text-white font-bold text-xs">
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-clock mr-1"></i>10초</span>
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>재도전</span>
+                    </div>
+                </div>
+
+                <!-- Reading Set B Card -->
+                <div onclick="selectSet('readingB')" class="game-btn bg-gradient-to-br from-purple-400 to-indigo-500 p-5 rounded-2xl border-4 border-white cursor-pointer hover:scale-[1.02] transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="bg-white text-indigo-600 text-xs font-black px-3 py-1 rounded-full">독해지문 3세트</span>
+                        <i class="fa-solid fa-mountain text-2xl text-white/80"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-white mb-1">등반, 대화 & 동물적 교감</h3>
+                    <p class="text-white/90 text-xs font-semibold mb-3">23번(등산 안전), 24번(질문하기), 29번(반려동물) 어휘 (10문항)</p>
+                    <div class="flex items-center space-x-2 text-white font-bold text-xs">
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-clock mr-1"></i>10초</span>
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>재도전</span>
+                    </div>
+                </div>
+
+                <!-- Reading Set C Card -->
+                <div onclick="selectSet('readingC')" class="game-btn bg-gradient-to-br from-emerald-400 to-teal-600 p-5 rounded-2xl border-4 border-white cursor-pointer hover:scale-[1.02] transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="bg-white text-teal-700 text-xs font-black px-3 py-1 rounded-full">독해지문 4세트</span>
+                        <i class="fa-solid fa-earth-americas text-2xl text-white/80"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-white mb-1">심리, 유래 & 지정학적 요인</h3>
+                    <p class="text-white/90 text-xs font-semibold mb-3">30번(마인드), 32번(관용구 유래), 40번(지리적 영향) 어휘 (10문항)</p>
+                    <div class="flex items-center space-x-2 text-white font-bold text-xs">
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-clock mr-1"></i>10초</span>
+                        <span class="bg-black/20 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>재도전</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-quiz" class="hidden w-full glass-card rounded-3xl p-6 md:p-8 space-y-6 relative overflow-hidden">
+            <!-- Progress Bar & Timer Header -->
+            <div class="flex items-center justify-between gap-4">
+                <!-- Progress Indicator -->
+                <div class="flex-grow bg-slate-200 h-4 rounded-full overflow-hidden p-0.5 border border-slate-300">
+                    <div id="quiz-progress-bar" class="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full transition-all duration-300" style="width: 10%;"></div>
+                </div>
+                <!-- Question Counter -->
+                <span id="question-count-text" class="font-extrabold text-slate-700 text-lg">1 / 10</span>
+
+                <!-- 10-Second Countdown Timer -->
+                <div id="timer-box" class="flex items-center space-x-1 bg-red-500 text-white font-black px-4 py-2 rounded-2xl border-2 border-white shadow pulse-timer">
+                    <i class="fa-solid fa-stopwatch"></i>
+                    <span id="timer-text" class="text-2xl w-8 text-center">10</span>
+                </div>
+            </div>
+
+            <!-- Context Passage & Sentence Display -->
+            <div class="bg-amber-50 rounded-2xl p-4 md:p-5 border-2 border-amber-200">
+                <div class="flex items-center space-x-2 mb-2">
+                    <span id="passage-tag" class="bg-amber-400 text-amber-950 text-xs font-black px-2.5 py-0.5 rounded-md">지문 문맥</span>
+                    <span id="word-type-tag" class="bg-purple-200 text-purple-800 text-xs font-bold px-2 py-0.5 rounded-md">단어 / 숙어</span>
+                </div>
+                <p id="question-context" class="text-slate-800 text-base md:text-lg leading-relaxed font-semibold italic">
+                    "Loading context..."
+                </p>
+            </div>
+
+            <!-- Target Word Prompt -->
+            <div class="text-center space-y-1">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Target Vocabulary</p>
+                <h3 id="target-word" class="text-3xl md:text-4xl font-black text-indigo-700 tracking-wide">
+                    WORD
+                </h3>
+            </div>
+
+            <!-- Multiple Choice Options (4 Choices) -->
+            <div id="options-container" class="grid md:grid-cols-2 gap-3">
+                <!-- Dynamic Buttons will be injected here -->
+            </div>
+
+            <!-- Praise / Feedback Banner (Hidden by default) -->
+            <div id="feedback-banner" class="hidden p-4 rounded-2xl text-center font-black text-xl transition-all border-2">
+                <span id="feedback-text">대단해요! 정확한 정답입니다! 🎉</span>
+            </div>
+        </section>
+
+        <section id="screen-result" class="hidden w-full glass-card rounded-3xl p-8 text-center space-y-6">
+            <div class="space-y-2">
+                <div class="inline-block bg-yellow-400 text-yellow-950 p-4 rounded-full shadow-lg border-2 border-white mb-2">
+                    <i class="fa-solid fa-trophy text-5xl"></i>
+                </div>
+                <h2 class="text-3xl md:text-4xl font-black text-slate-800">퀴즈 완주 성공! 🎉</h2>
+                <p class="text-slate-600 font-bold">수고하셨습니다! 교사 서버에 기록이 전달되었습니다.</p>
+            </div>
+
+            <!-- Result Stats Card -->
+            <div class="bg-white/80 p-6 rounded-2xl border-2 border-indigo-100 max-w-md mx-auto space-y-4 shadow-inner">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-slate-600 font-bold">참여자</span>
+                    <span id="result-student-name" class="text-xl font-black text-indigo-600">홍길동</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-slate-600 font-bold">도전 세트</span>
+                    <span id="result-set-title" class="font-black text-slate-800">교과서 1세트</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-slate-600 font-bold">총 시도 횟수</span>
+                    <span id="result-attempts" class="text-lg font-black text-purple-600">10회</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-600 font-bold">첫 시도 정답률</span>
+                    <span id="result-accuracy" class="text-2xl font-black text-emerald-600">100%</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-center gap-3">
+                <button onclick="showScreen('mode-select')" class="game-btn bg-slate-700 hover:bg-slate-800 text-white font-bold px-6 py-3.5 rounded-2xl border-2 border-white">
+                    <i class="fa-solid fa-rotate-right mr-2"></i>다른 세트 도전하기
+                </button>
+                <button onclick="openTeacherDashboard()" class="game-btn bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3.5 rounded-2xl border-2 border-white">
+                    <i class="fa-solid fa-chart-line mr-2"></i>참여 현황 확인하기
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="teacher-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl border-4 border-indigo-200 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-indigo-600 p-5 text-white flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <i class="fa-solid fa-users-viewfinder text-2xl text-yellow-300"></i>
+                    <div>
+                        <h3 class="text-xl font-black">학생 참여 및 학습 현황 (교사용)</h3>
+                        <p class="text-xs text-indigo-200 font-semibold">실시간으로 기록되는 학생들의 퀴즈 수행 내역입니다.</p>
+                    </div>
+                </div>
+                <button onclick="closeTeacherDashboard()" class="text-white/80 hover:text-white text-2xl font-bold px-2">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content & Table -->
+            <div class="p-6 overflow-y-auto flex-grow space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-extrabold text-slate-700">총 참여 학생 수: <strong id="total-students-count" class="text-indigo-600 text-lg">0</strong>명</span>
+                    <button onclick="clearStudentLogs()" class="text-xs bg-red-100 hover:bg-red-200 text-red-600 font-bold px-3 py-1.5 rounded-lg border border-red-300">
+                        <i class="fa-solid fa-trash mr-1"></i>기록 초기화
+                    </button>
+                </div>
+
+                <div class="border rounded-2xl overflow-hidden shadow-sm">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-100 text-slate-700 font-extrabold border-b">
+                            <tr>
+                                <th class="p-3">학생 이름</th>
+                                <th class="p-3">학습 세트</th>
+                                <th class="p-3">시도/맞힌수</th>
+                                <th class="p-3">정답률</th>
+                                <th class="p-3">완료 시각</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacher-table-body" class="divide-y font-semibold text-slate-700">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-slate-100 p-4 text-right">
+                <button onclick="closeTeacherDashboard()" class="bg-slate-700 text-white font-bold px-5 py-2 rounded-xl">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* 
+         * QUESTION DATABASE 
+         * Set 1: High School English II Lesson 2 (10 Questions)
+         * Set 2: Reading Booster Part 1 - Passages 20, 21, 22 (10 Questions)
+         * Set 3: Reading Booster Part 2 - Passages 23, 24, 29 (10 Questions)
+         * Set 4: Reading Booster Part 3 - Passages 30, 32, 40 (10 Questions)
+        */
+        const QUIZ_SETS = {
+            textbook: {
+                title: "교과서 Lesson 2. Science Is for Everyone",
+                questions: [
+                    {
+                        word: "conduct",
+                        type: "단어",
+                        context: "...who spend their days conducting experiments and analyzing data.",
+                        meaning: "실시하다, 수행하다",
+                        options: ["실시하다, 수행하다", "포기하다", "발명하다", "감추다"]
+                    },
+                    {
+                        word: "crowdsourced",
+                        type: "단어",
+                        context: "...ended up launching a crowdsourced online project known as Galaxy Zoo.",
+                        meaning: "크라우드소싱의 (대중참여형)",
+                        options: ["크라우드소싱의 (대중참여형)", "비밀리에 진행되는", "상업적인", "전문가 전용의"]
+                    },
+                    {
+                        word: "dull",
+                        type: "단어",
+                        context: "...his job there was dull and time-consuming.",
+                        meaning: "따분한, 지루한",
+                        options: ["따분한, 지루한", "매우 화려한", "급박한", "위험한"]
+                    },
+                    {
+                        word: "turn to",
+                        type: "숙어",
+                        context: "Lintott suggested that he turn to the Internet to ask other people for help.",
+                        meaning: "~에 의지하다, 도움을 청하다",
+                        options: ["~에 의지하다, 도움을 청하다", "~를 거절하다", "~를 비판하다", "~를 무시하다"]
+                    },
+                    {
+                        word: "if it had not been for",
+                        type: "숙어",
+                        context: "If it had not been for those participants, Schawinski couldn't have classified that many...",
+                        meaning: "~이 없었더라면",
+                        options: ["~이 없었더라면", "~에도 불구하고", "~을 시작으로", "~의 도움 덕분에"]
+                    },
+                    {
+                        word: "informal",
+                        type: "단어",
+                        context: "...there were some aurora chasers who formed an informal group online.",
+                        meaning: "비공식적인, 편안한",
+                        options: ["비공식적인, 편안한", "엄격한", "정부 주도의", "복잡한"]
+                    },
+                    {
+                        word: "phenomenon",
+                        type: "단어",
+                        context: "...the group decided to name the phenomenon 'Steve'...",
+                        meaning: "현상",
+                        options: ["현상", "재앙", "실험실", "망원경"]
+                    },
+                    {
+                        word: "in honor of",
+                        type: "숙어",
+                        context: "In honor of the aurora chasers who first discovered the phenomenon, the name 'Steve' has been kept.",
+                        meaning: "~을 기리기 위해, ~에게 경의를 표하여",
+                        options: ["~을 기리기 위해", "~을 비난하기 위해", "~에 반대하여", "~을 방지하기 위해"]
+                    },
+                    {
+                        word: "deserve the credit for",
+                        type: "숙어",
+                        context: "...the dedicated members of the aurora chasers group that deserve the credit for discovering STEVE.",
+                        meaning: "~에 대해 공로를 인정받을 만하다",
+                        options: ["~에 대해 공로를 인정받을 만하다", "~의 책임으로 처벌받다", "~를 포기해야만 한다", "~를 쉽게 잊다"]
+                    },
+                    {
+                        word: "capable of",
+                        type: "숙어",
+                        context: "...they are still capable of making valuable contributions to science.",
+                        meaning: "~할 능력이 있는",
+                        options: ["~할 능력이 있는", "~을 두려워하는", "~에 관심이 없는", "~에 반대하는"]
+                    }
+                ]
+            },
+            readingA: {
+                title: "독해 2세트 (20번, 21번, 22번 지문)",
+                questions: [
+                    {
+                        word: "vessel",
+                        type: "단어",
+                        context: "For an influencer, social media is just an empty vessel...",
+                        meaning: "그릇, 용기",
+                        options: ["그릇, 용기", "무기", "장애물", "결과물"]
+                    },
+                    {
+                        word: "show up",
+                        type: "숙어",
+                        context: "The point isn't just to show up online, but to understand the game...",
+                        meaning: "나타나다, 모습을 드러내다",
+                        options: ["나타나다, 모습을 드러내다", "포기하다", "사라지다", "비판하다"]
+                    },
+                    {
+                        word: "confuse A with B",
+                        type: "숙어",
+                        context: "...and confuse motion with meaning, assuming that being busy equals being productive.",
+                        meaning: "A와 B를 혼동하다",
+                        options: ["A와 B를 혼동하다", "A와 B를 비교하다", "A와 B를 조합하다", "A에서 B를 분리하다"]
+                    },
+                    {
+                        word: "performance of urgency",
+                        type: "숙어",
+                        context: "Some experts argue that this is simply 'a performance of urgency.'",
+                        meaning: "겉으로만 시급해 보이는 행동",
+                        options: ["겉으로만 시급해 보이는 행동", "완벽한 성과 달성", "긴급 구호 활동", "체계적인 시간 관리"]
+                    },
+                    {
+                        word: "stillness",
+                        type: "단어",
+                        context: "We forget that stillness can be strategic, and that stopping may help us think more clearly.",
+                        meaning: "고요함, 평정",
+                        options: ["고요함, 평정", "분주함", "급박함", "솔직함"]
+                    },
+                    {
+                        word: "constructive",
+                        type: "단어",
+                        context: "...and good learners view errors as a constructive part of this process.",
+                        meaning: "건설적인, 발전적인",
+                        options: ["건설적인, 발전적인", "파괴적인", "지루한", "불필요한"]
+                    },
+                    {
+                        word: "hold for",
+                        type: "숙어",
+                        context: "...and the same principle holds for computer, sporting and artistic skills.",
+                        meaning: "~에 해당되다, 적용되다",
+                        options: ["~에 해당되다, 적용되다", "~를 연기하다", "~를 반대하다", "~를 피하다"]
+                    },
+                    {
+                        word: "be discouraged by",
+                        type: "숙어",
+                        context: "Good learners, however, are not discouraged by making errors...",
+                        meaning: "~로 인해 낙담하다",
+                        options: ["~로 인해 낙담하다", "~로 인해 용기를 얻다", "~를 지휘하다", "~를 모의하다"]
+                    },
+                    {
+                        word: "skim through",
+                        type: "숙어",
+                        context: "We skim through messages, move between apps...",
+                        meaning: "대충 훑어보다",
+                        options: ["대충 훑어보다", "정독하다", "삭제하다", "전송하다"]
+                    },
+                    {
+                        word: "assumption",
+                        type: "단어",
+                        context: "...assuming that being busy equals being productive.",
+                        meaning: "추정, 가정",
+                        options: ["추정, 가정", "결론, 확신", "거절, 반대", "증명, 입증"]
+                    }
+                ]
+            },
+            readingB: {
+                title: "독해 3세트 (23번, 24번, 29번 지문)",
+                questions: [
+                    {
+                        word: "take on",
+                        type: "숙어",
+                        context: "You will also be able to take on harder climbs while still keeping the risk...",
+                        meaning: "(어려운 일·책임을) 떠맡다, 도전하다",
+                        options: ["떠맡다, 도전하다", "포기하다", "지연시키다", "경멸하다"]
+                    },
+                    {
+                        word: "abandon",
+                        type: "단어",
+                        context: "Abandoning the attempt is almost always an option...",
+                        meaning: "포기하다, 단념하다",
+                        options: ["포기하다, 단념하다", "지속하다", "성공하다", "계획하다"]
+                    },
+                    {
+                        word: "dictate",
+                        type: "단어",
+                        context: "Asking questions helps surface that understanding, whereas dictating terms doesn't.",
+                        meaning: "지시하다, 강요하다",
+                        options: ["지시하다, 강요하다", "경청하다", "협상하다", "칭찬하다"]
+                    },
+                    {
+                        word: "ultimatum",
+                        type: "단어",
+                        context: "Instead of asking questions and opening a negotiation, we issue an ultimatum.",
+                        meaning: "최후통첩",
+                        options: ["최후통첩", "초대장", "양해각서", "타협안"]
+                    },
+                    {
+                        word: "turn one's back",
+                        type: "숙어",
+                        context: "They will do what they want as soon as we turn our backs...",
+                        meaning: "등을 돌리다, 외면하다",
+                        options: ["등을 돌리다, 외면하다", "마주보다", "도움을 요청하다", "칭찬하다"]
+                    },
+                    {
+                        word: "shy away",
+                        type: "숙어",
+                        context: "Pets offer comfort to humans without hesitation, even when other humans shy away...",
+                        meaning: "피하다, 기피하다",
+                        options: ["피하다, 기피하다", "다가오다", "도와주다", "비판하다"]
+                    },
+                    {
+                        word: "nonjudgmental",
+                        type: "단어",
+                        context: "Animals are for the most part nonjudgmental, honest, and loyal companions.",
+                        meaning: "비판하지 않는, 무비판적인",
+                        options: ["비판하지 않는, 무비판적인", "판단력이 뛰어난", "엄격한", "냉정한"]
+                    },
+                    {
+                        word: "compelled to",
+                        type: "숙어",
+                        context: "Society makes us feel compelled to do things for other humans...",
+                        meaning: "~하도록 강요받다, 의무감을 느끼다",
+                        options: ["~하도록 강요받다", "~하는 것을 금지당하다", "~를 자유롭게 하다", "~에 감사하다"]
+                    },
+                    {
+                        word: "rationalize",
+                        type: "단어",
+                        context: "...it puts us in a position where we need to rationalize and defend our commitment...",
+                        meaning: "합리화하다",
+                        options: ["합리화하다", "비판하다", "포기하다", "조사하다"]
+                    },
+                    {
+                        word: "assessment",
+                        type: "단어",
+                        context: "Finally, you must rely on your assessment of your own climbing abilities...",
+                        meaning: "평가, 판단",
+                        options: ["평가, 판단", "과장, 허풍", "연습, 훈련", "부상, 피해"]
+                    }
+                ]
+            },
+            readingC: {
+                title: "독해 4세트 (30번, 32번, 40번 지문)",
+                questions: [
+                    {
+                        word: "visualize",
+                        type: "단어",
+                        context: "When one is terrified, one distinctly visualizes things one doesn't want to happen.",
+                        meaning: "시각화하다, 마음속에 그리다",
+                        options: ["시각화하다, 마음속에 그리다", "잊어버리다", "소리치다", "감추다"]
+                    },
+                    {
+                        word: "at the outset",
+                        type: "숙어",
+                        context: "...may be a challenge at the outset, with time, you can learn how to use imagery...",
+                        meaning: "처음에, 발단에",
+                        options: ["처음에, 발단에", "마지막에", "결국에는", "갑자기"]
+                    },
+                    {
+                        word: "forbid",
+                        type: "단어",
+                        context: "...they immediately passed a law forbidding the sale of pork.",
+                        meaning: "금지하다",
+                        options: ["금지하다", "허용하다", "권장하다", "축하하다"]
+                    },
+                    {
+                        word: "let the cat out of the bag",
+                        type: "숙어",
+                        context: "If something went wrong and the bag came open, this literally 'let the cat out of the bag.'",
+                        meaning: "비밀을 누설하다, 밝혀내다",
+                        options: ["비밀을 누설하다", "고양이를 구출하다", "거짓말을 하다", "물건을 사다"]
+                    },
+                    {
+                        word: "underestimate",
+                        type: "단어",
+                        context: "While geography may not always be the decisive factor, it is undoubtedly the most underestimated.",
+                        meaning: "과소평가하다",
+                        options: ["과소평가하다", "과장하다", "존경하다", "분석하다"]
+                    },
+                    {
+                        word: "disregard",
+                        type: "단어",
+                        context: "The physical realities that underpin national and international politics are too often disregarded...",
+                        meaning: "무시하다, 경시하다",
+                        options: ["무시하다, 경시하다", "존중하다", "강조하다", "조사하다"]
+                    },
+                    {
+                        word: "decisive",
+                        type: "단어",
+                        context: "While geography may not always be the decisive factor...",
+                        meaning: "결정적인, 확고한",
+                        options: ["결정적인, 확고한", "사소한", "모호한", "일시적인"]
+                    },
+                    {
+                        word: "apart from",
+                        type: "숙어",
+                        context: "...but in fact, apart from one month-long battle in 1962, they never have.",
+                        meaning: "~을 제외하고, ~외에는",
+                        options: ["~을 제외하고", "~에 더하여", "~의 결과로", "~을 원인으로"]
+                    },
+                    {
+                        word: "fortification",
+                        type: "단어",
+                        context: "The basis of effective mental training consists of positive image and emotional fortification.",
+                        meaning: "강화, 방어 시설",
+                        options: ["강화, 방어 시설", "약화, 붕괴", "포기", "착각"]
+                    },
+                    {
+                        word: "conducted in secret",
+                        type: "숙어",
+                        context: "In secret deals, usually conducted in the darkness of night...",
+                        meaning: "비밀리에 진행된",
+                        options: ["비밀리에 진행된", "공개적으로 진행된", "취소된", "성공적으로 마친"]
+                    }
+                ]
+            }
+        };
+
+        // Praise Messages Array
+        const PRAISE_MESSAGES = [
+            "🎉 최고예요! 완벽한 정답입니다!",
+            "⭐ 대단해요! 어휘 실력이 엄청나네요!",
+            "🔥 정답입니다! 계속 이 기세로 달려볼까요?",
+            "👏 훌륭합니다! 문맥을 제대로 파악하셨군요!",
+            "💡 정답! 단어 마스터가 되어가고 있어요!"
+        ];
+
+        // State Variables
+        let currentSetKey = 'textbook';
+        let currentQuestions = [];
+        let currentQIndex = 0;
+        let timerInterval = null;
+        let timeLeft = 10;
+        let studentName = "";
+        
+        // Tracking Metrics
+        let totalAttempts = 0;
+        let firstTryCorrectCount = 0;
+        let isFirstTryForCurrentQuestion = true;
+
+        // Audio Synth Context
+        let audioCtx = null;
+        let bgmOscillator = null;
+        let bgmGain = null;
+        let isBgmPlaying = false;
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Play Sound Effects (Correct / Wrong)
+        function playSoundEffect(type) {
+            initAudioContext();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                // Happy Chime Sound
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1); // E5
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2); // G5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3); // C6
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'wrong') {
+                // Low Buzz Sound
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(110, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+        }
+
+        // Simple Synth BGM Generator
+        function toggleBGM() {
+            initAudioContext();
+            if (isBgmPlaying) {
+                stopBGM();
+            } else {
+                startBGM();
+            }
+        }
+
+        function startBGM() {
+            if (isBgmPlaying || !audioCtx) return;
+
+            try {
+                // Create lightweight repeating cheerful loop using Web Audio API
+                bgmGain = audioCtx.createGain();
+                bgmGain.gain.setValueAtTime(0.05, audioCtx.currentTime); // Low background volume
+                bgmGain.connect(audioCtx.destination);
+
+                isBgmPlaying = true;
+                document.getElementById('bgm-btn').classList.replace('bg-purple-500', 'bg-green-500');
+                document.getElementById('bgm-text').innerText = 'BGM ON';
+
+                playBgmNotes();
+            } catch (e) {
+                console.log("Audio Error:", e);
+            }
+        }
+
+        let bgmTimeout = null;
+        function playBgmNotes() {
+            if (!isBgmPlaying) return;
+
+            const notes = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63]; // Happy C Major Sequence
+            let time = audioCtx.currentTime;
+
+            notes.forEach((freq, idx) => {
+                let osc = audioCtx.createOscillator();
+                let noteGain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, time + idx * 0.25);
+                noteGain.gain.setValueAtTime(0.03, time + idx * 0.25);
+                noteGain.gain.exponentialRampToValueAtTime(0.001, time + idx * 0.25 + 0.2);
+                
+                osc.connect(noteGain);
+                noteGain.connect(bgmGain);
+                
+                osc.start(time + idx * 0.25);
+                osc.stop(time + idx * 0.25 + 0.22);
+            });
+
+            bgmTimeout = setTimeout(() => {
+                if (isBgmPlaying) playBgmNotes();
+            }, 1600);
+        }
+
+        function stopBGM() {
+            isBgmPlaying = false;
+            if (bgmTimeout) clearTimeout(bgmTimeout);
+            document.getElementById('bgm-btn').classList.replace('bg-green-500', 'bg-purple-500');
+            document.getElementById('bgm-text').innerText = 'BGM OFF';
+        }
+
+        function showScreen(screenId) {
+            document.getElementById('screen-mode-select').classList.add('hidden');
+            document.getElementById('screen-quiz').classList.add('hidden');
+            document.getElementById('screen-result').classList.add('hidden');
+
+            document.getElementById(`screen-${screenId}`).classList.remove('hidden');
+        }
+
+        function selectSet(setKey) {
+            const nameInput = document.getElementById('student-name').value.trim();
+            if (!nameInput) {
+                alert('학생 이름을 먼저 입력해 주세요!');
+                document.getElementById('student-name').focus();
+                return;
+            }
+
+            studentName = nameInput;
+            currentSetKey = setKey;
+            currentQuestions = [...QUIZ_SETS[setKey].questions];
+            
+            // Reset Stats
+            currentQIndex = 0;
+            totalAttempts = 0;
+            firstTryCorrectCount = 0;
+
+            // Start BGM if not active
+            if (!isBgmPlaying) {
+                startBGM();
+            }
+
+            showScreen('quiz');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            clearInterval(timerInterval);
+            isFirstTryForCurrentQuestion = true;
+
+            const q = currentQuestions[currentQIndex];
+            
+            // Update UI Counters
+            document.getElementById('quiz-progress-bar').style.width = `${((currentQIndex + 1) / currentQuestions.length) * 100}%`;
+            document.getElementById('question-count-text').innerText = `${currentQIndex + 1} / ${currentQuestions.length}`;
+            
+            // Context & Target Word
+            document.getElementById('question-context').innerText = `"${q.context}"`;
+            document.getElementById('target-word').innerText = q.word;
+            document.getElementById('word-type-tag').innerText = q.type;
+
+            // Hide Feedback Banner
+            const banner = document.getElementById('feedback-banner');
+            banner.classList.add('hidden');
+
+            // Shuffle Options
+            const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            shuffledOptions.forEach((optionText) => {
+                const btn = document.createElement('button');
+                btn.className = "game-btn bg-white hover:bg-amber-100 text-slate-800 font-extrabold text-lg p-4 rounded-2xl border-2 border-amber-300 text-left transition flex items-center justify-between";
+                btn.innerHTML = `
+                    <span>${optionText}</span>
+                    <i class="fa-regular fa-circle-check text-amber-400 opacity-40"></i>
+                `;
+                btn.onclick = () => checkAnswer(optionText, q.meaning, btn);
+                container.appendChild(btn);
+            });
+
+            // Start 10-Second Countdown
+            startTimer();
+        }
+
+        function startTimer() {
+            timeLeft = 10;
+            document.getElementById('timer-text').innerText = timeLeft;
+            document.getElementById('timer-box').className = "flex items-center space-x-1 bg-red-500 text-white font-black px-4 py-2 rounded-2xl border-2 border-white shadow pulse-timer";
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-text').innerText = timeLeft;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+
+        // Handle Time Out (Triggers retry mechanics)
+        function handleTimeOut() {
+            totalAttempts++;
+            isFirstTryForCurrentQuestion = false;
+            playSoundEffect('wrong');
+
+            const quizCard = document.getElementById('screen-quiz');
+            quizCard.classList.add('wrong-shake');
+            setTimeout(() => quizCard.classList.remove('wrong-shake'), 400);
+
+            showFeedback(false, "⏰ 시간 초과! 다시 한번 생각해보세요!");
+            
+            // Re-enable options for repeat attempt
+            startTimer();
+        }
+
+        function checkAnswer(selected, correct, btnElement) {
+            totalAttempts++;
+
+            if (selected === correct) {
+                // Correct Answer!
+                clearInterval(timerInterval);
+                playSoundEffect('correct');
+
+                if (isFirstTryForCurrentQuestion) {
+                    firstTryCorrectCount++;
+                }
+
+                // Trigger Praise Confetti
+                confetti({
+                    particleCount: 60,
+                    spread: 70,
+                    origin: { y: 0.7 }
+                });
+
+                // Pick random praise response
+                const randomPraise = PRAISE_MESSAGES[Math.floor(Math.random() * PRAISE_MESSAGES.length)];
+                showFeedback(true, randomPraise);
+
+                // Highlight correct button
+                btnElement.classList.replace('bg-white', 'bg-emerald-500');
+                btnElement.classList.replace('text-slate-800', 'text-white');
+
+                // Move to next question after 1.2 seconds
+                setTimeout(() => {
+                    currentQIndex++;
+                    if (currentQIndex < currentQuestions.length) {
+                        loadQuestion();
+                    } else {
+                        finishQuiz();
+                    }
+                }, 1200);
+
+            } else {
+                // Wrong Answer! Repeat requirement
+                isFirstTryForCurrentQuestion = false;
+                playSoundEffect('wrong');
+
+                const quizCard = document.getElementById('screen-quiz');
+                quizCard.classList.add('wrong-shake');
+                setTimeout(() => quizCard.classList.remove('wrong-shake'), 400);
+
+                // Mark selected button red momentarily
+                btnElement.classList.add('bg-red-100', 'border-red-400', 'text-red-600');
+                btnElement.disabled = true;
+
+                showFeedback(false, "❌ 틀렸습니다! 다시 시도해보세요! (10초 리셋)");
+                
+                // Reset time for retry
+                clearInterval(timerInterval);
+                startTimer();
+            }
+        }
+
+        function showFeedback(isCorrect, text) {
+            const banner = document.getElementById('feedback-banner');
+            const textSpan = document.getElementById('feedback-text');
+            banner.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'border-emerald-300', 'bg-red-100', 'text-red-800', 'border-red-300');
+
+            if (isCorrect) {
+                banner.classList.add('bg-emerald-100', 'text-emerald-800', 'border-emerald-300');
+            } else {
+                banner.classList.add('bg-red-100', 'text-red-800', 'border-red-300');
+            }
+
+            textSpan.innerText = text;
+        }
+
+        function finishQuiz() {
+            clearInterval(timerInterval);
+
+            // Calculate Metrics
+            const accuracy = Math.round((firstTryCorrectCount / currentQuestions.length) * 100);
+            
+            // Save log to localStorage for Teacher Tracking
+            saveTeacherLog({
+                name: studentName,
+                setTitle: QUIZ_SETS[currentSetKey].title,
+                attempts: totalAttempts,
+                correctCount: currentQuestions.length,
+                accuracy: accuracy,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+
+            // Update Result UI
+            document.getElementById('result-student-name').innerText = studentName;
+            document.getElementById('result-set-title').innerText = QUIZ_SETS[currentSetKey].title;
+            document.getElementById('result-attempts').innerText = `${totalAttempts}회 시도`;
+            document.getElementById('result-accuracy').innerText = `${accuracy}%`;
+
+            showScreen('result');
+        }
+
+        function saveTeacherLog(logData) {
+            let logs = JSON.parse(localStorage.getItem('voca_quiz_teacher_logs') || '[]');
+            logs.unshift(logData); // Add latest first
+            localStorage.setItem('voca_quiz_teacher_logs', JSON.stringify(logs));
+        }
+
+        function openTeacherDashboard() {
+            const modal = document.getElementById('teacher-modal');
+            modal.classList.remove('hidden');
+            renderTeacherLogs();
+        }
+
+        function closeTeacherDashboard() {
+            document.getElementById('teacher-modal').classList.add('hidden');
+        }
+
+        function renderTeacherLogs() {
+            const logs = JSON.parse(localStorage.getItem('voca_quiz_teacher_logs') || '[]');
+            const tbody = document.getElementById('teacher-table-body');
+            document.getElementById('total-students-count').innerText = logs.length;
+
+            if (logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="p-6 text-center text-slate-400 font-bold">
+                            아직 참여한 학생 기록이 없습니다.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => `
+                <tr class="hover:bg-slate-50 border-b">
+                    <td class="p-3 font-black text-indigo-700">${log.name}</td>
+                    <td class="p-3 text-xs font-bold text-slate-600">${log.setTitle}</td>
+                    <td class="p-3 font-extrabold text-purple-600">${log.attempts}회 시도 / ${log.correctCount}문항</td>
+                    <td class="p-3">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-black ${log.accuracy >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+                            ${log.accuracy}%
+                        </span>
+                    </td>
+                    <td class="p-3 text-xs text-slate-400 font-bold">${log.timestamp}</td>
+                </tr>
+            `).join('');
+        }
+
+        function clearStudentLogs() {
+            if (confirm("모든 학생 참여 기록을 삭제하시겠습니까?")) {
+                localStorage.removeItem('voca_quiz_teacher_logs');
+                renderTeacherLogs();
+            }
+        }
+    </script>
+</body>
+</html>
